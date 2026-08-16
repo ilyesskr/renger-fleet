@@ -27,8 +27,7 @@ In a second terminal:
 ```bash
 cd backend
 cp .env.example .env       # then edit: PGSSL=false, DATABASE_URL=postgres://postgres:password@localhost:5433/ranger_fleet
-npm run migrate            # creates the kv_store table (safe to re-run)
-npm start                  # serves the app + API on http://localhost:3000
+npm start                  # applies the schema automatically, then serves the app + API on http://localhost:3000
 ```
 
 Data persists across restarts under `backend/.pgdata` (gitignored). This local Postgres is dev-only — `.env.example`'s defaults (`PGSSL=true`, port 5432) are aimed at a real hosted Postgres for production; override them as above just for local runs.
@@ -40,6 +39,7 @@ The original app already called an async `window.storage.get(key, personal) / .s
 - One Postgres table, `kv_store (key TEXT PRIMARY KEY, value TEXT, updated_at TIMESTAMPTZ)`.
 - Three routes: `GET/PUT/DELETE /api/storage/:key`.
 - A shim in `frontend/index.html` that implements the same `window.storage` interface via `fetch()` calls to those routes.
+- The server applies the schema itself on every startup (`CREATE TABLE IF NOT EXISTS`, so it's a no-op once the table exists) — no separate migration step needed, which matters since Render's free tier has no Shell access to run one manually.
 
 Everything else in the 2000+ line app script — state shape, rendering, migrations between schema versions — is untouched. The app still stores its whole state as one JSON blob (key `ranger-fleet-state-v4`) plus one row per photo (key `photo-<id>`, a compressed base64 JPEG data URL). This is intentionally simple rather than a fully relational schema: fine for one shop's data volume and a small number of concurrent editors, at the cost of "last write wins" if two people save changes to the *whole state* at the exact same moment (per-checkbox/per-field edits are frequent though, so the window for a real clash is small).
 
@@ -51,7 +51,7 @@ Any host that runs Node + gives you a Postgres instance works (Render, Railway, 
 2. **New → PostgreSQL** — name it (e.g. `ranger-fleet-db`), pick the free tier, create it. Once ready, copy its connection string (Internal Database URL if the web service will also be on Render, External otherwise).
 3. **New → Web Service** — connect this repo, set **Root Directory** to `backend`, **Build Command** to `npm install`, **Start Command** to `npm start`.
 4. In the service's **Environment** tab, set `DATABASE_URL` to the connection string from step 2 (leave `PGSSL` unset — it defaults to `true`, which is correct for hosted Postgres). `PORT` is set automatically by Render.
-5. Deploy, then run the migration once — either from Render's Shell tab (`npm run migrate`) or locally with `DATABASE_URL` temporarily pointed at the *external* connection string.
+5. Deploy. The app applies its own schema on startup — no migration step to run manually.
 6. Visit the deployed URL — the app now persists through the real hosted Postgres.
 
 ## Original single-file version

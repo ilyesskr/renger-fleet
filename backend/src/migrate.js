@@ -1,16 +1,16 @@
+// Manual/optional: the server also applies the schema automatically on
+// startup (see server.js), so this is only useful for applying it without
+// starting the server.
 require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
 const pool = require('./db');
+const { ensureSchema } = require('./schema');
 
-async function migrate() {
-  const sql = fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8');
-  await pool.query(sql);
-  console.log('Schema applied.');
-  await pool.end();
-}
-
-migrate().catch((err) => {
-  console.error('Migration failed:', err);
-  process.exit(1);
-});
+ensureSchema()
+  .then(async () => {
+    console.log('Schema applied.');
+    await pool.end();
+  })
+  .catch((err) => {
+    console.error('Migration failed:', err);
+    process.exit(1);
+  });

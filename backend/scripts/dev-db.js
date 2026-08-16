@@ -2,14 +2,16 @@
 // needed. Not used in production — deploy against a real hosted Postgres
 // (see README) and point DATABASE_URL at that instead.
 require('dotenv').config();
+const fs = require('fs');
 const path = require('path');
 const EmbeddedPostgres = require('embedded-postgres').default;
 
 const DB_NAME = 'ranger_fleet';
 const PORT = 5433;
+const DATA_DIR = path.join(__dirname, '..', '.pgdata');
 
 const pg = new EmbeddedPostgres({
-  databaseDir: path.join(__dirname, '..', '.pgdata'),
+  databaseDir: DATA_DIR,
   user: 'postgres',
   password: 'password',
   port: PORT,
@@ -17,7 +19,8 @@ const pg = new EmbeddedPostgres({
 });
 
 async function main() {
-  await pg.initialise();
+  const alreadyInitialised = fs.existsSync(path.join(DATA_DIR, 'PG_VERSION'));
+  if (!alreadyInitialised) await pg.initialise();
   await pg.start();
   try {
     await pg.createDatabase(DB_NAME);

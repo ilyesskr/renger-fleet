@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const pool = require('./db');
+const { ensureSchema } = require('./schema');
 
 const app = express();
 
@@ -48,4 +49,12 @@ app.delete('/api/storage/:key', async (req, res) => {
 app.use(express.static(path.join(__dirname, '..', '..', 'frontend')));
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Ranger fleet server listening on :${port}`));
+
+ensureSchema()
+  .then(() => {
+    app.listen(port, () => console.log(`Ranger fleet server listening on :${port}`));
+  })
+  .catch((err) => {
+    console.error('Failed to apply schema on startup:', err);
+    process.exit(1);
+  });
