@@ -10,7 +10,9 @@ French-language web app for tracking the refurbishment of a fleet of Ford Ranger
 
 ## Status
 
-Backend built and verified end-to-end locally: a value written through the API survives a full server restart (proving it's really in Postgres, not just in-memory), and the app's actual save/load shape (whole-state JSON blob + a photo entry) round-trips correctly through the same endpoints. The only thing left is deploying to a real host — see **Deploying** below, which needs your own cloud account (nothing further to build once that exists).
+Live at https://renger-fleet.onrender.com — web service on Render, database on [Neon](https://neon.tech) (Render's own free Postgres tier expires ~30 days after creation and gets deleted, so the database was moved to Neon's free tier, which doesn't expire). Verified end-to-end in production: a write survives a full server restart, and both the raw storage API and the app's actual save/load shape (whole-state JSON blob + a photo entry) round-trip correctly.
+
+Code: on Render, the `renger-fleet` web service (root dir `backend`) auto-deploys from this repo's `main` branch. `DATABASE_URL` in its Environment tab points at the Neon connection string — that's the one thing to update if the database ever moves again.
 
 ## Running locally
 
