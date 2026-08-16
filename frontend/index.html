@@ -9,6 +9,14 @@
   // backend in /backend. Mirrors the get(key, personal)/set/delete shape
   // the app already calls, so the rest of the script is unchanged.
   // The "personal" flag is ignored: everything is one shared store.
+  //
+  // WRITE_SECRET guards writes/deletes so a public URL can't be wiped by
+  // anyone who finds it — must match the backend's WRITE_SECRET exactly.
+  // It's still visible to anyone who reads this page's source (same as the
+  // Direction PIN below), so it stops opportunistic/automated abuse, not a
+  // determined attacker who inspects the app.
+  const WRITE_SECRET = 'iNu_IfOFGYifuJKn-AbuVQyCEGgXtN58';
+
   window.storage = {
     async get(key){
       const res = await fetch('/api/storage/' + encodeURIComponent(key));
@@ -18,13 +26,16 @@
     async set(key, value){
       const res = await fetch('/api/storage/' + encodeURIComponent(key), {
         method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-write-secret': WRITE_SECRET},
         body: JSON.stringify({value})
       });
       if(!res.ok) throw new Error('storage_write_failed');
     },
     async delete(key){
-      const res = await fetch('/api/storage/' + encodeURIComponent(key), { method: 'DELETE' });
+      const res = await fetch('/api/storage/' + encodeURIComponent(key), {
+        method: 'DELETE',
+        headers: {'x-write-secret': WRITE_SECRET}
+      });
       if(!res.ok) throw new Error('storage_delete_failed');
     }
   };

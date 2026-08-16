@@ -9,6 +9,22 @@ const app = express();
 // Compressed photos are data URLs (base64 JPEG, ~<1MB typically); 15mb leaves headroom.
 app.use(express.json({ limit: '15mb' }));
 
+// Reads stay open (the app already treats all data as readable regardless of
+// role — the Direction PIN only hides things in the UI). Writes/deletes need
+// a shared secret so a public URL can't be wiped by anyone who finds it.
+// Fails closed: an unset WRITE_SECRET blocks writes rather than silently
+// allowing them, so a missing env var is loud instead of a silent hole.
+function requireWriteSecret(req, res, next) {
+  if (!process.env.WRITE_SECRET) {
+    console.error('WRITE_SECRET is not configured — refusing write.');
+    return res.status(500).json({ error: 'write_secret_not_configured' });
+  }
+  if (req.get('x-write-secret') !== process.env.WRITE_SECRET) {
+    return res.status(403).json({ error: 'invalid_write_secret' });
+  }
+  next();
+}
+
 app.get('/api/storage/:key', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT value FROM kv_store WHERE key = $1', [req.params.key]);
@@ -20,7 +36,7 @@ app.get('/api/storage/:key', async (req, res) => {
   }
 });
 
-app.put('/api/storage/:key', async (req, res) => {
+app.put('/api/storage/:key', requireWriteSecret, async (req, res) => {
   const { value } = req.body;
   if (typeof value !== 'string') return res.status(400).json({ error: 'value_must_be_string' });
   try {
@@ -36,7 +52,7 @@ app.put('/api/storage/:key', async (req, res) => {
   }
 });
 
-app.delete('/api/storage/:key', async (req, res) => {
+app.delete('/api/storage/:key', requireWriteSecret, async (req, res) => {
   try {
     await pool.query('DELETE FROM kv_store WHERE key = $1', [req.params.key]);
     res.json({ ok: true });

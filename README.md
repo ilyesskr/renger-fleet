@@ -28,7 +28,7 @@ In a second terminal:
 
 ```bash
 cd backend
-cp .env.example .env       # then edit: PGSSL=false, DATABASE_URL=postgres://postgres:password@localhost:5433/ranger_fleet
+cp .env.example .env       # then edit: PGSSL=false, DATABASE_URL=postgres://postgres:password@localhost:5433/ranger_fleet, WRITE_SECRET=(match frontend/index.html)
 npm start                  # applies the schema automatically, then serves the app + API on http://localhost:3000
 ```
 
@@ -42,6 +42,7 @@ The original app already called an async `window.storage.get(key, personal) / .s
 - Three routes: `GET/PUT/DELETE /api/storage/:key`.
 - A shim in `frontend/index.html` that implements the same `window.storage` interface via `fetch()` calls to those routes.
 - The server applies the schema itself on every startup (`CREATE TABLE IF NOT EXISTS`, so it's a no-op once the table exists) — no separate migration step needed, which matters since Render's free tier has no Shell access to run one manually.
+- Writes and deletes require a shared secret (`WRITE_SECRET` env var on the backend, matched by a hardcoded constant in `frontend/index.html`'s shim, sent as the `x-write-secret` header). Reads stay open. This exists because the API is now a public URL with no login — without it, anyone who finds the URL could wipe the database with one unauthenticated `DELETE` request. It stops that class of accidental/automated abuse; it does not stop someone who deliberately reads the page source (same caveat as the Direction PIN below — this is a guardrail, not real access control).
 
 Everything else in the 2000+ line app script — state shape, rendering, migrations between schema versions — is untouched. The app still stores its whole state as one JSON blob (key `ranger-fleet-state-v4`) plus one row per photo (key `photo-<id>`, a compressed base64 JPEG data URL). This is intentionally simple rather than a fully relational schema: fine for one shop's data volume and a small number of concurrent editors, at the cost of "last write wins" if two people save changes to the *whole state* at the exact same moment (per-checkbox/per-field edits are frequent though, so the window for a real clash is small).
 
@@ -52,7 +53,7 @@ Any host that runs Node + gives you a Postgres instance works (Render, Railway, 
 1. Sign up / log in at render.com.
 2. **New → PostgreSQL** — name it (e.g. `ranger-fleet-db`), pick the free tier, create it. Once ready, copy its connection string (Internal Database URL if the web service will also be on Render, External otherwise).
 3. **New → Web Service** — connect this repo, set **Root Directory** to `backend`, **Build Command** to `npm install`, **Start Command** to `npm start`.
-4. In the service's **Environment** tab, set `DATABASE_URL` to the connection string from step 2 (leave `PGSSL` unset — it defaults to `true`, which is correct for hosted Postgres). `PORT` is set automatically by Render.
+4. In the service's **Environment** tab, set `DATABASE_URL` to the connection string from step 2 (leave `PGSSL` unset — it defaults to `true`, which is correct for hosted Postgres), and `WRITE_SECRET` to the exact same value hardcoded in `frontend/index.html`'s `window.storage` shim (search for `WRITE_SECRET` in that file). `PORT` is set automatically by Render.
 5. Deploy. The app applies its own schema on startup — no migration step to run manually.
 6. Visit the deployed URL — the app now persists through the real hosted Postgres.
 
